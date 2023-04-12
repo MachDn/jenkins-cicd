@@ -1,0 +1,42 @@
+pipeline {
+    agent any
+    environment {
+        DOCKER_HUB_USERNAME = credentials('docker-hub-username')
+        DOCKER_HUB_PASSWORD = credentials('docker-hub-password')
+        SSH_PRIVATE_KEY = credentials('ssh-private-key')
+        SSH_KNOWN_HOSTS = credentials('ssh-known-hosts')
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                // Check out the source code from the Git repository
+                git 'https://github.com/MachDn/jenkins-cicd.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                // Build the Docker image and push it to Docker Hub
+                withCredentials([usernamePassword(credentialsId: 'docker-hub', usernameVariable: 'DOCKER_HUB_USERNAME', passwordVariable: 'DOCKER_HUB_PASSWORD')]) {
+                    sh 'docker build -t moveho/jenkinswebapp:latest .'
+                    sh 'docker push moveho/jenkinswebapp:latest'
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                // Deploy the Docker image to the VM using Docker Compose
+                sshagent(['ssh-private-key']) {
+                    sh '''
+                        ssh -o "StrictHostKeyChecking=no" kevin@y192.168.56.105 << EOF
+                        cd /path/to/your/docker-compose/directory
+                        docker-compose down
+                        docker-compose pull
+                        docker-compose up -d
+                        EOF
+                    '''
+                }
+            }
+        }
+    }
+}
+
